@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WIRE DESK</title>
+<style>
+  @font-face {
+    font-family: 'IBM Plex Mono';
+    src: local('IBM Plex Mono');
+  }
+  :root {
+    --bg: #08090a;
+    --panel: #0e1011;
+    --amber: #ffb000;
+    --amber-dim: #7a5600;
+    --green: #2ee66b;
+    --red: #ff4d4f;
+    --gray: #6b7178;
+    --line: #1c1f22;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--amber);
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+    height: 100%;
+  }
+
+  /* ---- Ticker tape header ---- */
+  .ticker-wrap {
+    background: #000;
+    border-bottom: 1px solid var(--amber-dim);
+    overflow: hidden;
+    white-space: nowrap;
+    height: 34px;
+    display: flex;
+    align-items: center;
+  }
+  .ticker-track {
+    display: inline-flex;
+    animation: scroll 60s linear infinite;
+    padding-left: 100%;
+  }
+  .ticker-wrap:hover .ticker-track { animation-play-state: paused; }
+  @keyframes scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
+  }
+  .ticker-item {
+    padding: 0 2.2rem;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--amber);
+    border-right: 1px solid var(--amber-dim);
+  }
+  .ticker-item .t-time { color: var(--gray); margin-right: 0.6rem; }
+
+  /* ---- Top bar ---- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .brand {
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    color: var(--amber);
+  }
+  .brand .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--green);
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+  .status {
+    font-size: 11px;
+    color: var(--gray);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .status span.live { color: var(--green); }
+
+  /* ---- Controls ---- */
+  .controls {
+    display: flex;
+    gap: 8px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .controls input[type=text] {
+    flex: 1;
+    min-width: 200px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--amber);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+  }
+  .controls input[type=text]:focus { border-color: var(--amber-dim); }
+  .controls button {
+    background: transparent;
+    border: 1px solid var(--amber-dim);
+    color: var(--amber);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    padding: 9px 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .controls button:hover { background: var(--amber); color: #000; }
+  .presets {
+    display: flex;
+    gap: 6px;
+    padding: 0 18px 12px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--line);
+  }
+  .preset {
+    font-size: 11px;
+    color: var(--gray);
+    border: 1px solid var(--line);
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  .preset:hover { color: var(--amber); border-color: var(--amber-dim); }
+  .preset.active { color: #000; background: var(--amber); border-color: var(--amber); }
+
+  /* ---- Feed ---- */
+  .feed {
+    padding: 4px 0 60px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 62px 1fr 90px;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    align-items: start;
+    text-decoration: none;
+    animation: none;
+  }
+  .row.fresh {
+    animation: flash 2.2s ease-out;
+  }
+  @keyframes flash {
+    0% { background: rgba(255,176,0,0.16); }
+    100% { background: transparent; }
+  }
+  .row .time {
+    font-size: 11px;
+    color: var(--gray);
+    padding-top: 2px;
+  }
+  .row .headline {
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: #e8e2d4;
+  }
+  .row .headline a {
+    color: #e8e2d4;
+    text-decoration: none;
+  }
+  .row .headline a:hover { color: var(--amber); text-decoration: underline; }
+  .row .source {
+    font-size: 10.5px;
+    color: var(--gray);
+    text-align: right;
+    padding-top: 3px;
+    word-break: break-word;
+  }
+  .empty, .loading {
+    text-align: center;
+    color: var(--gray);
+    font-size: 12px;
+    padding: 60px 20px;
+  }
+  .cursor {
+    display: inline-block;
+    width: 7px; height: 12px;
+    background: var(--amber);
+    animation: blink 1s steps(1) infinite;
+    vertical-align: middle;
+    margin-left: 3px;
+  }
+  footer {
+    text-align: center;
+    font-size: 10px;
+    color: var(--gray);
+    padding: 20px;
+    border-top: 1px solid var(--line);
+  }
+
+  @media (max-width: 480px) {
+    .row { grid-template-columns: 50px 1fr; }
+    .row .source { grid-column: 2; text-align: left; margin-top: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="tickerTrack"></div></div>
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span>WIRE DESK</div>
+  <div class="status">
+    <span id="lastUpdate">connecting…</span>
+    <span class="live" id="nextRefresh"></span>
+  </div>
+</div>
+
+<div class="controls">
+  <input type="text" id="queryInput" value="Iran OR Fed OR &quot;interest rate&quot; OR oil OR sanctions OR tariffs OR OPEC OR markets" />
+  <button id="searchBtn">SEARCH</button>
+</div>
+
+<div class="presets" id="presets">
+  <div class="preset active" data-q='Iran OR Fed OR "interest rate" OR oil OR sanctions OR tariffs OR OPEC OR markets'>ALL MARKET-MOVING</div>
+  <div class="preset" data-q='Iran OR Israel OR sanctions OR "Strait of Hormuz" OR war OR ceasefire'>GEOPOLITICS</div>
+  <div class="preset" data-q='Federal Reserve OR "interest rate" OR inflation OR CPI OR jobs report OR FOMC'>FED / MACRO</div>
+  <div class="preset" data-q='oil OR OPEC OR crude OR Brent OR "Strait of Hormuz" OR energy prices'>ENERGY</div>
+  <div class="preset" data-q='stocks OR "S&P 500" OR Nasdaq OR earnings OR selloff OR rally'>EQUITIES</div>
+</div>
+
+<div class="feed" id="feed">
+  <div class="loading">LOADING WIRE<span class="cursor"></span></div>
+</div>
+
+<footer>
+  Source: GDELT Project Doc API · Free, ~15&nbsp;min index delay · Not a substitute for a paid real-time wire · Auto-refreshes every 90s
+</footer>
+
+<script>
+const feedEl = document.getElementById('feed');
+const tickerEl = document.getElementById('tickerTrack');
+const lastUpdateEl = document.getElementById('lastUpdate');
+const nextRefreshEl = document.getElementById('nextRefresh');
+const queryInput = document.getElementById('queryInput');
+const searchBtn = document.getElementById('searchBtn');
+const presetsEl = document.getElementById('presets');
+
+let seenUrls = new Set();
+let refreshTimer = null;
+let countdownTimer = null;
+let countdown = 90;
+const REFRESH_SECONDS = 90;
+
+function buildUrl(query) {
+  const base = 'https://api.gdeltproject.org/api/v2/doc/doc';
+  const params = new URLSearchParams({
+    query: '(' + query + ') sourcelang:english',
+    mode: 'artlist',
+    format: 'json',
+    maxrecords: '60',
+    sort: 'datedesc',
+    timespan: '2days'
+  });
+  return base + '?' + params.toString();
+}
+
+function fmtTime(dateStr) {
+  // GDELT seendate format: YYYYMMDDTHHMMSSZ
+  if (!dateStr || dateStr.length < 15) return '--:--';
+  const h = dateStr.slice(9,11), m = dateStr.slice(11,13);
+  const d = new Date(Date.UTC(
+    +dateStr.slice(0,4), +dateStr.slice(4,6)-1, +dateStr.slice(6,8),
+    +h, +m
+  ));
+  return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+
+function domainOf(url) {
+  try { return new URL(url).hostname.replace('www.',''); }
+  catch(e) { return ''; }
+}
+
+async function loadFeed(isFirstLoad) {
+  const q = queryInput.value.trim() || 'markets';
+  lastUpdateEl.textContent = 'fetching…';
+  try {
+    const res = await fetch(buildUrl(q));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const articles = (data.articles || []).slice(0, 50);
+
+    if (articles.length === 0) {
+      feedEl.innerHTML = '<div class="empty">NO RESULTS — try a broader search term</div>';
+      lastUpdateEl.textContent = 'no results';
+      return;
+    }
+
+    const newUrls = new Set();
+    const rows = articles.map(a => {
+      newUrls.add(a.url);
+      const isFresh = !isFirstLoad && !seenUrls.has(a.url);
+      const time = fmtTime(a.seendate);
+      const dom = domainOf(a.url);
+      return `<a class="row ${isFresh ? 'fresh' : ''}" href="${a.url}" target="_blank" rel="noopener">
+        <div class="time">${time}</div>
+        <div class="headline">${escapeHtml(a.title || '(untitled)')}</div>
+        <div class="source">${dom}</div>
+      </a>`;
+    });
+    feedEl.innerHTML = rows.join('');
+    seenUrls = newUrls;
+
+    // ticker: most recent 12 headlines
+    const tickerItems = articles.slice(0, 12).map(a =>
+      `<span class="ticker-item"><span class="t-time">${fmtTime(a.seendate)}</span>${escapeHtml(a.title || '')}</span>`
+    ).join('');
+    tickerEl.innerHTML = tickerItems + tickerItems; // duplicate for seamless loop
+
+    const now = new Date();
+    lastUpdateEl.textContent = 'updated ' + now.toLocaleTimeString();
+  } catch (err) {
+    lastUpdateEl.textContent = 'error — retrying next cycle';
+    if (isFirstLoad) {
+      feedEl.innerHTML = '<div class="empty">Could not reach GDELT.<br>This can happen if the API is rate-limiting — it will retry automatically.</div>';
+    }
+    console.error(err);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function startCountdown() {
+  countdown = REFRESH_SECONDS;
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdown -= 1;
+    nextRefreshEl.textContent = '● LIVE — next refresh in ' + countdown + 's';
+    if (countdown <= 0) countdown = REFRESH_SECONDS;
+  }, 1000);
+}
+
+function scheduleRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => loadFeed(false), REFRESH_SECONDS * 1000);
+  startCountdown();
+}
+
+searchBtn.addEventListener('click', () => {
+  presetsEl.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+  seenUrls = new Set();
+  loadFeed(true);
+  scheduleRefresh();
+});
+
+queryInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') searchBtn.click();
+});
+
+presetsEl.addEventListener('click', (e) => {
+  const preset = e.target.closest('.preset');
+  if (!preset) return;
+  presetsEl.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+  preset.classList.add('active');
+  queryInput.value = preset.dataset.q;
+  seenUrls = new Set();
+  loadFeed(true);
+  scheduleRefresh();
+});
+
+// init
+loadFeed(true);
+scheduleRefresh();
+</script>
+
+</body>
+</html>
