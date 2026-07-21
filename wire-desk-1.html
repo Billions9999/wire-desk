@@ -229,6 +229,7 @@
   <div class="preset" data-q='Federal Reserve OR "interest rate" OR inflation OR CPI OR jobs report OR FOMC'>FED / MACRO</div>
   <div class="preset" data-q='oil OR OPEC OR crude OR Brent OR "Strait of Hormuz" OR energy prices'>ENERGY</div>
   <div class="preset" data-q='stocks OR "S&P 500" OR Nasdaq OR earnings OR selloff OR rally'>EQUITIES</div>
+  <div class="preset" data-q='NSE OR BSE OR Sensex OR Nifty OR "Indian markets" OR RBI OR SEBI'>INDIA NSE/BSE</div>
 </div>
 
 <div class="feed" id="feed">
@@ -236,7 +237,7 @@
 </div>
 
 <footer>
-  Sources: Google News, CNBC, MarketWatch, Investing.com (RSS) · Free, typically updates within minutes of publish · Not a substitute for a paid real-time wire · Auto-refreshes every 60s
+  Sources: Google News, CNBC, MarketWatch, Investing.com, Moneycontrol, ET (RSS) · Free, typically updates within minutes of publish · Not a substitute for a paid real-time wire · Auto-refreshes every 60s
 </footer>
 
 <script>
@@ -259,6 +260,11 @@ const FIXED_FEEDS = [
   'https://www.cnbc.com/id/20910258/device/rss/rss.html',
   'https://feeds.content.dowjones.io/public/rss/mw_topstories',
   'https://www.investing.com/rss/news.rss'
+];
+
+const INDIA_FEEDS = [
+  'https://www.moneycontrol.com/rss/latestnews.xml',
+  'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms'
 ];
 
 function googleNewsUrl(query) {
@@ -295,7 +301,9 @@ async function loadFeed(isFirstLoad) {
   const q = queryInput.value.trim() || 'markets';
   lastUpdateEl.textContent = 'fetching…';
   try {
-    const feedUrls = [googleNewsUrl(q), ...FIXED_FEEDS];
+    const isIndia = /NSE|BSE|Sensex|Nifty/i.test(q);
+    const extraFeeds = isIndia ? INDIA_FEEDS : FIXED_FEEDS;
+    const feedUrls = [googleNewsUrl(q), ...extraFeeds];
     const results = await Promise.allSettled(feedUrls.map(fetchRss));
 
     let articles = [];
