@@ -27,8 +27,6 @@
     font-family: 'IBM Plex Mono', 'Courier New', monospace;
     height: 100%;
   }
-
-  /* ---- Ticker tape header ---- */
   .ticker-wrap {
     background: #000;
     border-bottom: 1px solid var(--amber-dim);
@@ -56,8 +54,6 @@
     border-right: 1px solid var(--amber-dim);
   }
   .ticker-item .t-time { color: var(--gray); margin-right: 0.6rem; }
-
-  /* ---- Top bar ---- */
   .topbar {
     display: flex;
     align-items: center;
@@ -91,8 +87,6 @@
     gap: 14px;
   }
   .status span.live { color: var(--green); }
-
-  /* ---- Controls ---- */
   .controls {
     display: flex;
     gap: 8px;
@@ -141,8 +135,6 @@
   }
   .preset:hover { color: var(--amber); border-color: var(--amber-dim); }
   .preset.active { color: #000; background: var(--amber); border-color: var(--amber); }
-
-  /* ---- Feed ---- */
   .feed {
     padding: 4px 0 60px;
     max-width: 900px;
@@ -208,7 +200,6 @@
     padding: 20px;
     border-top: 1px solid var(--line);
   }
-
   @media (max-width: 480px) {
     .row { grid-template-columns: 50px 1fr; }
     .row .source { grid-column: 2; text-align: left; margin-top: 4px; }
@@ -245,7 +236,7 @@
 </div>
 
 <footer>
-  Source: GDELT Project Doc API · Free, ~15&nbsp;min index delay · Not a substitute for a paid real-time wire · Auto-refreshes every 90s
+  Sources: Google News, CNBC, MarketWatch, Investing.com (RSS) · Free, typically updates within minutes of publish · Not a substitute for a paid real-time wire · Auto-refreshes every 60s
 </footer>
 
 <script>
@@ -261,29 +252,37 @@ let seenUrls = new Set();
 let refreshTimer = null;
 let countdownTimer = null;
 let countdown = 90;
-const REFRESH_SECONDS = 90;
+const REFRESH_SECONDS = 60;
 
-function buildUrl(query) {
-  const base = 'https://api.gdeltproject.org/api/v2/doc/doc';
-  const params = new URLSearchParams({
-    query: '(' + query + ') sourcelang:english',
-    mode: 'artlist',
-    format: 'json',
-    maxrecords: '60',
-    sort: 'datedesc',
-    timespan: '2days'
-  });
-  return base + '?' + params.toString();
+const FIXED_FEEDS = [
+  'https://www.cnbc.com/id/100003114/device/rss/rss.html',
+  'https://www.cnbc.com/id/20910258/device/rss/rss.html',
+  'https://feeds.content.dowjones.io/public/rss/mw_topstories',
+  'https://www.investing.com/rss/news.rss'
+];
+
+function googleNewsUrl(query) {
+  const q = encodeURIComponent(query);
+  return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
 }
 
-function fmtTime(dateStr) {
-  // GDELT seendate format: YYYYMMDDTHHMMSSZ
-  if (!dateStr || dateStr.length < 15) return '--:--';
-  const h = dateStr.slice(9,11), m = dateStr.slice(11,13);
-  const d = new Date(Date.UTC(
-    +dateStr.slice(0,4), +dateStr.slice(4,6)-1, +dateStr.slice(6,8),
-    +h, +m
-  ));
+async function fetchRss(rssUrl) {
+  const api = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(rssUrl);
+  const res = await fetch(api);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (data.status !== 'ok') throw new Error('feed error');
+  return (data.items || []).map(item => ({
+    title: item.title,
+    link: item.link,
+    pubDate: item.pubDate,
+    source: (data.feed && data.feed.title) || domainOf(item.link)
+  }));
+}
+
+function fmtTime(pubDate) {
+  const d = new Date(pubDate);
+  if (isNaN(d.getTime())) return '--:--';
   return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 }
 
@@ -296,44 +295,53 @@ async function loadFeed(isFirstLoad) {
   const q = queryInput.value.trim() || 'markets';
   lastUpdateEl.textContent = 'fetching…';
   try {
-    const res = await fetch(buildUrl(q));
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const articles = (data.articles || []).slice(0, 50);
+    const feedUrls = [googleNewsUrl(q), ...FIXED_FEEDS];
+    const results = await Promise.allSettled(feedUrls.map(fetchRss));
+
+    let articles = [];
+    results.forEach(r => {
+      if (r.status === 'fulfilled') articles = articles.concat(r.value);
+    });
 
     if (articles.length === 0) {
-      feedEl.innerHTML = '<div class="empty">NO RESULTS — try a broader search term</div>';
-      lastUpdateEl.textContent = 'no results';
-      return;
+      throw new Error('all feeds failed');
     }
+
+    const seen = new Set();
+    articles = articles.filter(a => {
+      if (!a.link || seen.has(a.link)) return false;
+      seen.add(a.link);
+      return true;
+    });
+    articles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    articles = articles.slice(0, 60);
 
     const newUrls = new Set();
     const rows = articles.map(a => {
-      newUrls.add(a.url);
-      const isFresh = !isFirstLoad && !seenUrls.has(a.url);
-      const time = fmtTime(a.seendate);
-      const dom = domainOf(a.url);
-      return `<a class="row ${isFresh ? 'fresh' : ''}" href="${a.url}" target="_blank" rel="noopener">
+      newUrls.add(a.link);
+      const isFresh = !isFirstLoad && !seenUrls.has(a.link);
+      const time = fmtTime(a.pubDate);
+      const dom = domainOf(a.link) || a.source || '';
+      return `<a class="row ${isFresh ? 'fresh' : ''}" href="${a.link}" target="_blank" rel="noopener">
         <div class="time">${time}</div>
         <div class="headline">${escapeHtml(a.title || '(untitled)')}</div>
-        <div class="source">${dom}</div>
+        <div class="source">${escapeHtml(dom)}</div>
       </a>`;
     });
     feedEl.innerHTML = rows.join('');
     seenUrls = newUrls;
 
-    // ticker: most recent 12 headlines
     const tickerItems = articles.slice(0, 12).map(a =>
-      `<span class="ticker-item"><span class="t-time">${fmtTime(a.seendate)}</span>${escapeHtml(a.title || '')}</span>`
+      `<span class="ticker-item"><span class="t-time">${fmtTime(a.pubDate)}</span>${escapeHtml(a.title || '')}</span>`
     ).join('');
-    tickerEl.innerHTML = tickerItems + tickerItems; // duplicate for seamless loop
+    tickerEl.innerHTML = tickerItems + tickerItems;
 
     const now = new Date();
     lastUpdateEl.textContent = 'updated ' + now.toLocaleTimeString();
   } catch (err) {
     lastUpdateEl.textContent = 'error — retrying next cycle';
     if (isFirstLoad) {
-      feedEl.innerHTML = '<div class="empty">Could not reach GDELT.<br>This can happen if the API is rate-limiting — it will retry automatically.</div>';
+      feedEl.innerHTML = '<div class="empty">Could not reach news feeds.<br>This can happen if a source is rate-limiting — it will retry automatically.</div>';
     }
     console.error(err);
   }
@@ -383,10 +391,9 @@ presetsEl.addEventListener('click', (e) => {
   scheduleRefresh();
 });
 
-// init
 loadFeed(true);
 scheduleRefresh();
 </script>
 
 </body>
-</html>
+  </html>
